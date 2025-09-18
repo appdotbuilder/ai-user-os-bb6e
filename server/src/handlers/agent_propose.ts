@@ -1,17 +1,41 @@
+import { db } from '../db';
+import { agentEventsTable } from '../db/schema';
 import { type AgentProposeInput, type AgentEvent } from '../schema';
 
 export const agentPropose = async (input: AgentProposeInput, workspaceId: string): Promise<AgentEvent> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is processing agent proposals (NoteTakingAgent, TaskAgent, SchedulerAgent, KnowledgeAgent).
-    // It creates a draft agent event that appears in the SilentTray for user approval.
-    return Promise.resolve({
-        id: '00000000-0000-0000-0000-000000000000', // Placeholder UUID
+  try {
+    // Map agent types to their corresponding actions
+    const agentActions: Record<string, string> = {
+      'NoteTakingAgent': 'create_note',
+      'TaskAgent': 'create_task',
+      'SchedulerAgent': 'create_calendar_event',
+      'KnowledgeAgent': 'extract_knowledge'
+    };
+
+    // Determine the action based on the agent type, fallback to generic 'propose_action'
+    const action = agentActions[input.agent] || 'propose_action';
+
+    // Insert agent event record with draft status
+    const result = await db.insert(agentEventsTable)
+      .values({
         workspace_id: workspaceId,
         agent: input.agent,
-        action: 'propose_action', // Will be determined by agent type
+        action: action,
         input: input.input_json,
         output: null, // Will be populated when executed
-        status: 'draft',
-        created_at: new Date()
-    } as AgentEvent);
+        status: 'draft' // Default status for proposals awaiting user approval
+      })
+      .returning()
+      .execute();
+
+    const agentEvent = result[0];
+    return {
+      ...agentEvent,
+      input: agentEvent.input as Record<string, any> | null,
+      output: agentEvent.output as Record<string, any> | null
+    };
+  } catch (error) {
+    console.error('Agent proposal creation failed:', error);
+    throw error;
+  }
 };

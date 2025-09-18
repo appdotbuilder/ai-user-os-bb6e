@@ -1,19 +1,29 @@
+import { db } from '../db';
+import { notesTable } from '../db/schema';
 import { type CreateNoteInput, type Note } from '../schema';
 
 export const createNote = async (input: CreateNoteInput): Promise<Note> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new note in a workspace, typically from meeting transcripts or manual input.
-    return Promise.resolve({
-        id: '00000000-0000-0000-0000-000000000000', // Placeholder UUID
+  try {
+    // Insert note record
+    const result = await db.insert(notesTable)
+      .values({
         workspace_id: input.workspace_id,
         title: input.title,
         source: input.source,
         content_md: input.content_md || null,
         transcript_text: input.transcript_text || null,
-        summary_text: null, // Will be populated by NoteTakingAgent
-        entities: null, // Will be populated by NoteTakingAgent
-        created_by: input.created_by,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Note);
+        created_by: input.created_by
+      })
+      .returning()
+      .execute();
+
+    const note = result[0];
+    return {
+      ...note,
+      entities: note.entities as Record<string, any> | null
+    };
+  } catch (error) {
+    console.error('Note creation failed:', error);
+    throw error;
+  }
 };
